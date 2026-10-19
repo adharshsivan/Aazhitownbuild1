@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Remix Aazhi — Island Vertical Slice",
+  "description": "A compact, walkable Three.js recreation of the Kerala-inspired island reference with elevated metro station, waterfront café, and procedural vegetation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

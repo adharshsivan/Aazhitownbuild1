@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" width="400" height="225">
+  <defs>
+    <linearGradient id="lowSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="60%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+    <linearGradient id="lowSun" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="lowRoad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sky & Flat Grid -->
+  <rect width="400" height="225" fill="url(#lowSky)"/>
+  <circle cx="320" cy="65" r="28" fill="url(#lowSun)"/>
+
+  <!-- Low-Poly Mountain Silhouette (Flat Shading) -->
+  <polygon points="40,140 110,60 180,140" fill="#3b82f6" opacity="0.6"/>
+  <polygon points="110,60 180,140 150,140" fill="#1d4ed8" opacity="0.5"/>
+  <polygon points="140,140 220,45 300,140" fill="#2563eb" opacity="0.7"/>
+  <polygon points="220,45 300,140 260,140" fill="#1e40af" opacity="0.6"/>
+  <polygon points="260,140 330,75 390,140" fill="#3b82f6" opacity="0.5"/>
+
+  <!-- Geometric Flat Buildings -->
+  <rect x="30" y="95" width="35" height="50" fill="#475569"/>
+  <rect x="75" y="80" width="40" height="65" fill="#64748b"/>
+  <rect x="125" y="105" width="30" height="40" fill="#475569"/>
+  <rect x="250" y="88" width="45" height="57" fill="#64748b"/>
+  <rect x="305" y="100" width="38" height="45" fill="#475569"/>
+  <rect x="350" y="85" width="35" height="60" fill="#64748b"/>
+
+  <!-- Ground Plane & Road -->
+  <polygon points="0,140 400,140 400,225 0,225" fill="#0f172a"/>
+  <polygon points="160,140 240,140 330,225 70,225" fill="url(#lowRoad)"/>
+
+  <!-- Road Dashes -->
+  <polygon points="198,145 202,145 204,165 196,165" fill="#f8fafc" opacity="0.8"/>
+  <polygon points="195,175 205,175 208,205 192,205" fill="#f8fafc" opacity="0.9"/>
+
+  <!-- Low Poly Palm Trees -->
+  <polygon points="45,150 48,150 49,185 44,185" fill="#78350f"/>
+  <polygon points="30,150 46,145 35,160" fill="#16a34a"/>
+  <polygon points="46,145 62,150 55,162" fill="#15803d"/>
+  <polygon points="46,145 46,135" stroke="#16a34a" stroke-width="4"/>
+
+  <!-- Vignette Frame & Minimal Grid Overlay -->
+  <rect width="400" height="225" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+  <path d="M0,170 H400 M0,200 H400" stroke="rgba(255,255,255,0.06)" stroke-dasharray="8 6"/>
+
+  <!-- Badge Overlay -->
+  <rect x="12" y="12" width="60" height="22" rx="6" fill="#0284c7" opacity="0.9"/>
+  <text x="42" y="27" font-family="system-ui, sans-serif" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle">LOW</text>
+  <rect x="306" y="12" width="82" height="22" rx="6" fill="rgba(0,0,0,0.65)"/>
+  <text x="347" y="27" font-family="monospace" font-size="10" font-weight="700" fill="#38bdf8" text-anchor="middle">⚡ FAST 60+</text>
+</svg>
