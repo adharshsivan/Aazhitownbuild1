@@ -591,6 +591,7 @@ const aazhiApi = {
 };
 
 const lokamGame = createAazhiLokamBridge(aazhiApi, inputService, eventBus, settings);
+window.__aazhi = aazhiApi;
 mountLokamHUD(lokamGame);
 initDevPanel(atmo);
 

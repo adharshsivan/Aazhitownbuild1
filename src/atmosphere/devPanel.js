@@ -6,10 +6,15 @@ import { QUALITY_MODES, QUALITY_PROFILES } from './index.js';
 
 export function initDevPanel(atmo) {
   const $ = (id) => document.getElementById(id);
-  const btn = $('wind-btn'), win = $('wind-debug'), hdr = $('wind-debug-hdr'), closeBtn = $('wind-debug-close');
-  const optBar = $('opt-bar'), optBtnLbl = $('opt-btn-lbl');
-  const optCurLbl = $('opt-cur-lbl'), optDesc = $('opt-desc'), swOptBar = $('sw-opt-bar');
-  if (!btn || !win) return;
+
+  const setup = (retries = 30) => {
+    const btn = $('wind-btn'), win = $('wind-debug'), hdr = $('wind-debug-hdr'), closeBtn = $('wind-debug-close');
+    const optBar = $('opt-bar'), optBtnLbl = $('opt-btn-lbl');
+    const optCurLbl = $('opt-cur-lbl'), optDesc = $('opt-desc'), swOptBar = $('sw-opt-bar');
+    if (!btn || !win || !hdr || !closeBtn) {
+      if (retries > 0) setTimeout(() => setup(retries - 1), 50);
+      return;
+    }
 
   const buildOptButtons = (container) => {
     if (!container) return;
@@ -96,6 +101,9 @@ export function initDevPanel(atmo) {
     win.classList.toggle('open', open);
     btn.classList.toggle('active', open);
   };
+  window.toggleDevPanel = toggle;
+  window.openDevPanel = () => toggle(true);
+  window.closeDevPanel = () => toggle(false);
   btn.addEventListener('click', () => toggle());
   closeBtn.addEventListener('click', () => toggle(false));
   win.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -462,4 +470,6 @@ export function initDevPanel(atmo) {
   };
   tick();
   setInterval(tick, 250);
+  };
+  setup();
 }

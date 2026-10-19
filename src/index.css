@@ -1,1 +1,37 @@
 @import "tailwindcss";
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.glimmer-border-glow {
+  background: conic-gradient(
+    from 0deg,
+    #38bdf8,
+    #818cf8,
+    #c084fc,
+    #f472b6,
+    #fb7185,
+    #38bdf8
+  );
+  animation: spin-slow 4s linear infinite;
+}
+
+.glass-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

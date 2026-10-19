@@ -269,6 +269,13 @@ vec3 rotateRockCoord(vec3 p) {
       `)
       .replace('#include <roughnessmap_fragment>', `
         #include <roughnessmap_fragment>
+        float wSurfR = waterSurf(vRockW.xz);
+        float wetR = smoothstep(0.92, -0.06, vRockW.y - wSurfR);
+        roughnessFactor = mix(roughnessFactor, 0.14, wetR);
+        roughnessFactor = clamp(roughnessFactor + (0.5 - rockH) * 0.14 * (1.0 - wetR * 0.6), 0.10, 0.98);
+      `)
+      .replace('#include <normal_fragment_maps>', `
+        #include <normal_fragment_maps>
         {
           vec3 wn2 = inverseTransformDirection(normalize(vNormal), viewMatrix);
           vec3 tw2 = pow(abs(wn2), vec3(4.0)); tw2 /= (tw2.x + tw2.y + tw2.z + 1e-5);
@@ -281,10 +288,6 @@ vec3 rotateRockCoord(vec3 p) {
           vec3 wBump = vec3(n.y * wn2.x, n.x, n.x * wn2.z) * (0.42 * bumpAtten);
           normal = normalize(normal + (viewMatrix * vec4(wBump, 0.0)).xyz);
         }
-        float wSurfR = waterSurf(vRockW.xz);
-        float wetR = smoothstep(0.92, -0.06, vRockW.y - wSurfR);
-        roughnessFactor = mix(roughnessFactor, 0.14, wetR);
-        roughnessFactor = clamp(roughnessFactor + (0.5 - rockH) * 0.14 * (1.0 - wetR * 0.6), 0.10, 0.98);
       `);
   };
   m.customProgramCacheKey = () => 'aazhi-rock-v3-mobile';
