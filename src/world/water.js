@@ -211,14 +211,13 @@ export function buildWater(scene, data, coastT, fog) {
         return grad * (0.80 + 0.22 * uSeaState);
       }
 
-      // Organic multi-octave FBM foam pattern (warped uNoiseTex — zero Voronoi honeycomb/snake-skin cells!)
-      float organicSeaFoam(vec2 xz, vec2 flowDir, float t) {
-        vec2 p1 = xz * 0.095 - flowDir * (t * 0.08);
+      // Smooth, low-frequency laminar coastal water variation (zero high-frequency furry curls or speckles)
+      float coastalWaterSheen(vec2 xz, vec2 flowDir, float t) {
+        vec2 p1 = xz * 0.034 - flowDir * (t * 0.045);
         vec4 n1 = texture2D(uNoiseTex, p1);
-        vec2 warp = (n1.rg - 0.5) * 0.55;
-        vec4 n2 = texture2D(uNoiseTex, rotW(xz, 0.72) * 0.23 - flowDir * (t * 0.13) + warp);
-        vec4 n3 = texture2D(uNoiseTex, rotW(xz, -0.54) * 0.52 + flowDir * (t * 0.06) - warp * 0.7);
-        return n1.b * 0.34 + n2.r * 0.40 + n3.g * 0.26;
+        vec2 warp = (n1.rg - 0.5) * 0.06;
+        vec4 n2 = texture2D(uNoiseTex, rotW(xz, 0.72) * 0.078 - flowDir * (t * 0.065) + warp);
+        return smoothstep(0.22, 0.78, n1.b * 0.58 + n2.r * 0.42);
       }
 
       void main() {
@@ -299,56 +298,43 @@ export function buildWater(scene, data, coastT, fog) {
         float swashFresAtten = mix(1.0, smoothstep(0.02, 0.45, dWater), c.b);
         vec3 col = mix(refr, skyR, clamp(fres * 0.82 * swashFresAtten, 0.0, 0.84)) + uSunColW * spec * 1.35 * farAtten * swashFresAtten;
 
-        // 4. Continuous coastal surf & wave-rock crest impact (zero c.g/dWater branch cutoffs!)
+        // 4. Clean, continuous liquid coastal surf & translucent wave-rock surge (zero furry noise!)
         float rockProx = c.a;
-        float foamField = organicSeaFoam(xz, vec2(0.85, -0.45), uWTime);
         float beachMask = smoothstep(0.05, 0.60, c.b);
-        float surfZone = max(beachMask * (1.0 - smoothstep(1.4, 2.8, dWater)), rockProx);
+        float surfZone = max(beachMask * (1.0 - smoothstep(1.4, 2.6, dWater)), rockProx);
         float surfFoamVis = 0.0;
 
-        if (surfZone > 0.001) {
+        if (surfZone > 0.002) {
           float psi = shorePsi1(c, uWTime);
-          float grp = 0.65 + 0.35 * shoreGroup(xz, uWTime);
+          float grp = 0.68 + 0.32 * shoreGroup(xz, uWTime);
+          float sheen = 0.72 + 0.28 * coastalWaterSheen(xz, vec2(0.85, -0.45), uWTime);
           float wavePeak = max(0.0, sin(psi + 0.25));
-          float wavePeak3 = wavePeak * wavePeak * wavePeak;
+          float wavePeak4 = wavePeak * wavePeak * wavePeak * wavePeak;
 
-          // A. Sandy pocket beach: smooth pitching roller crest + delicate swash leading-edge lace
-          float beachCrest = wavePeak3 * smoothstep(0.08, 0.65, dWater) * (1.0 - smoothstep(0.75, 2.2, dWater)) * beachMask;
-          float swashLip = (1.0 - smoothstep(0.01, 0.26, dWater)) * smoothstep(0.0, 0.04, dWater) * (0.42 + 0.42 * sin(psi)) * beachMask;
+          // A. Sandy pocket beach: smooth, continuous translational wave roller + delicate glassy swash lip
+          float beachCrest = wavePeak4 * smoothstep(0.12, 0.58, dWater) * (1.0 - smoothstep(0.72, 1.95, dWater)) * beachMask;
+          float swashLip = (1.0 - smoothstep(0.01, 0.18, dWater)) * smoothstep(0.0, 0.035, dWater) * (0.38 + 0.38 * max(0.0, sin(psi))) * beachMask;
 
-          // B. Waterline boulders (c.a): foam forms when a 3D wave crest surges up against the rock
-          float waveSurge = smoothstep(-0.04, 0.22, e0) * (0.55 + 0.45 * max(0.0, sin(psi + 0.15)));
-          float rockImpact = smoothstep(0.18, 0.85, rockProx) * waveSurge;
-          float rockDrain = smoothstep(0.48, 0.95, rockProx) * smoothstep(-0.14, 0.08, e0) * 0.26;
+          // B. Waterline boulders (c.a): smooth translucent aquamarine aeration swell on wave surge
+          float waveSurge = smoothstep(0.0, 0.22, e0) * wavePeak * wavePeak;
+          float rockAeration = smoothstep(0.32, 0.92, rockProx) * waveSurge * 0.48;
+          float rockCrest = smoothstep(0.62, 0.96, rockProx) * wavePeak4 * smoothstep(0.02, 0.18, e0) * 0.32;
 
-          float amt = clamp((beachCrest * 0.62 + swashLip * 0.44 + rockImpact * 0.66 + rockDrain) * grp, 0.0, 0.76);
-          if (amt > 0.003) {
-            vec3 aerSub = mix(refr, uFoamCol * vec3(0.68, 0.82, 0.80), 0.38);
-            float subMask = smoothstep(0.28, 0.78, foamField + amt * 0.38) * amt * 0.42;
-            float topMask = smoothstep(0.66 - amt * 0.34, 0.94 - amt * 0.22, foamField) * amt * 0.68;
-            col = mix(col, aerSub, subMask);
-            col = mix(col, uFoamCol * 0.90, topMask);
-            surfFoamVis = max(subMask * 0.65, topMask);
-          }
+          vec3 aerSub = mix(refr, uFoamCol * vec3(0.68, 0.85, 0.84), 0.42);
+          float subMix = clamp((beachCrest * 0.45 + rockAeration) * grp * sheen, 0.0, 0.38);
+          float crestMix = clamp((beachCrest * 0.42 + swashLip * 0.36 + rockCrest) * grp * sheen, 0.0, 0.48);
+          col = mix(col, aerSub, subMix);
+          col = mix(col, uFoamCol * 0.88, crestMix);
+          surfFoamVis = max(subMix * 0.5, crestMix);
         }
 
-        // 4a. Offshore wind-driven whitecaps on steep 3D open-ocean wave crests
-        float slopeMag = length(slope);
-        float whitecapEnv = smoothstep(0.18, 0.38, e0 + slopeMag * 0.35) * smoothstep(2.2, 6.5, dWater) * farAtten;
-        if (whitecapEnv > 0.005) {
-          float wcMask = smoothstep(0.58 - whitecapEnv * 0.35, 0.86 - whitecapEnv * 0.25, foamField) * whitecapEnv;
-          col = mix(col, uFoamCol * 0.88, clamp(wcMask * 0.62, 0.0, 0.65));
-        }
-
-        // 4b. Clean, smooth boat Kelvin wake & prop-wash slipstream (zero noisy speckles!)
+        // 4b. Clean, laminar boat Kelvin wake & prop-wash slipstream (zero furry speckles!)
         if (bw0.y > 0.004) {
-          float wakeTurb = organicSeaFoam(xz * 0.65, -uBoatWake.zw, uWTime * 0.85);
-          // Smooth subsurface aerated sea-green plume in the slipstream
-          vec3 aerCol = mix(refr, uFoamCol * vec3(0.64, 0.80, 0.78), 0.45);
-          col = mix(col, aerCol, clamp(bw0.y * 0.48, 0.0, 0.44));
-          // Silky white prop-wash core & Kelvin crest foam
-          float wFoam = smoothstep(0.52 - bw0.y * 0.36, 0.86 - bw0.y * 0.24, wakeTurb) * bw0.y;
-          col = mix(col, uFoamCol * 0.92, clamp(wFoam * 0.65 + bw0.y * bw0.y * 0.22, 0.0, 0.76));
+          float wakeSheen = 0.78 + 0.22 * coastalWaterSheen(xz * 0.55, -uBoatWake.zw, uWTime * 0.65);
+          vec3 aerCol = mix(refr, uFoamCol * vec3(0.66, 0.84, 0.82), 0.45);
+          col = mix(col, aerCol, clamp(bw0.y * 0.46, 0.0, 0.42));
+          float wCrest = smoothstep(0.28, 0.88, bw0.y * wakeSheen) * bw0.y;
+          col = mix(col, uFoamCol * 0.90, clamp(wCrest * 0.52, 0.0, 0.58));
         }
 
         // 5. Wide, gradual shoreline feathering on sandy beach (zero inner or outer sharp lines!)

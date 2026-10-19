@@ -269,13 +269,9 @@ vec3 rotateRockCoord(vec3 p) {
         diffuseColor.rgb *= mix(1.0, 0.52, wet);
         // Intertidal marine algae tint in the lower wave-washed zone
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.76, 0.91, 0.70), (1.0 - smoothstep(-0.35, 0.22, vRockW.y)) * 0.78);
-        // Subtle 3D waterline contact meniscus where a rising wave crest meets the stone face
-        float meniscusBand = exp(-pow(hAboveWave / 0.032, 2.0)) * smoothstep(-0.08, 0.18, etaRock);
-        if (meniscusBand > 0.01) {
-          float fNoise = texture2D(uNoiseTex, vRockW.xz * 0.28 + vec2(uWTime * 0.03, -uWTime * 0.02)).r;
-          float mMask = smoothstep(0.32, 0.75, fNoise + meniscusBand * 0.35) * meniscusBand * 0.52;
-          diffuseColor.rgb = mix(diffuseColor.rgb, uFoamCol * 0.88, mMask);
-        }
+        // Subtle, smooth 3D waterline contact meniscus where a rising wave crest meets the stone face
+        float meniscusBand = exp(-pow(hAboveWave / 0.026, 2.0)) * smoothstep(-0.04, 0.16, etaRock);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uFoamCol * 0.82, meniscusBand * 0.28);
         diffuseColor.rgb *= 1.0 + 0.12 * smoothstep(0.55, 0.95, wn.y) * smoothstep(0.6, 1.4, vRockW.y);
       `)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>

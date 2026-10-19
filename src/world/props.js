@@ -1074,12 +1074,12 @@ function buildWakeAndCollars(scene, coastT, fog, mooredHulls) {
           float absV = abs(v);
           float sFromBow = mix(0.0, 28.8, pow(u, 1.08));
 
-          // Smooth, low-frequency advecting water texture (zero noisy speckles)
-          vec2 flowUv1 = xz * 0.14 - vFwd * (uWTime * 0.16);
-          vec2 flowUv2 = vec2(u * 2.6 - uWTime * 0.24, v * 1.2);
+          // Smooth, low-frequency laminar water flow (zero furry speckles)
+          vec2 flowUv1 = xz * 0.055 - vFwd * (uWTime * 0.10);
+          vec2 flowUv2 = vec2(u * 1.4 - uWTime * 0.16, v * 0.75);
           float n1 = texture2D(uNoiseTex, flowUv1).r;
           float n2 = texture2D(uNoiseTex, flowUv2).g;
-          float silk = 0.72 + 0.28 * (n1 * 0.6 + n2 * 0.4);
+          float silk = 0.82 + 0.18 * (n1 * 0.6 + n2 * 0.4);
 
           // 1. Sleek Kelvin V-arms peeling off the hull chines
           float armCenter1 = mix(0.44, 0.74, smoothstep(0.0, 9.0, sFromBow));
@@ -1092,19 +1092,19 @@ function buildWakeAndCollars(scene, coastT, fog, mooredHulls) {
           float propSpread = mix(0.11, 0.30, smoothstep(5.0, 26.0, sFromBow));
           float propWash = exp(-pow(absV / propSpread, 2.0)) * sternU;
 
-          float env = clamp(vArm1 * 0.78 + propWash * 0.92, 0.0, 1.0);
+          float env = clamp(vArm1 * 0.68 + propWash * 0.78, 0.0, 1.0);
           float edgeFeather = (1.0 - smoothstep(0.82, 1.0, absV)) * smoothstep(0.0, 0.04, u) * (1.0 - smoothstep(0.82, 1.0, u));
           env *= edgeFeather * silk;
 
-          alpha = clamp(env * 0.68, 0.0, 0.72);
-          float whiteMix = clamp(vArm1 * 0.65 + propWash * 0.55 + smoothstep(0.02, 0.08, vCrest) * 0.35, 0.0, 0.88);
+          alpha = clamp(env * 0.52, 0.0, 0.56);
+          float whiteMix = clamp(vArm1 * 0.55 + propWash * 0.48 + smoothstep(0.02, 0.08, vCrest) * 0.28, 0.0, 0.78);
           col = mix(aerAqua, foamBase, whiteMix);
         } else {
           // Part B: Subtle moored hull waterline meniscus (no noisy collar)
           float v = vWakeUv.y;
-          float ringEnv = (1.0 - smoothstep(0.0, 0.45, v)) * smoothstep(0.0, 0.08, v);
-          alpha = clamp(ringEnv * 0.18, 0.0, 0.20);
-          col = mix(aerAqua, foamBase, 0.55);
+          float ringEnv = (1.0 - smoothstep(0.0, 0.42, v)) * smoothstep(0.0, 0.08, v);
+          alpha = clamp(ringEnv * 0.12, 0.0, 0.14);
+          col = mix(aerAqua, foamBase, 0.45);
         }
 
         if (alpha < 0.006) discard;
@@ -1127,32 +1127,53 @@ function buildWakeAndCollars(scene, coastT, fog, mooredHulls) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Sleek, Low-Slung Bow Chine Water Sheets (Zero Noisy Speckles)
+// 2. Continuous 3D Curved Bow-Chine Hydrodynamic Water Sheet (Zero Billboard Fur!)
 // ---------------------------------------------------------------------------
 function buildBoatSpray(scene, coastT, fog) {
-  const TOTAL = 48;
+  // Instead of instanced billboard puffs that look like fluffy white fur along the hull,
+  // build a sleek, continuous 2-sided 3D curved water-sheet ribbon peeling smoothly off
+  // the port and starboard bow chines and folding back into the water surface.
+  const segU = 24, segV = 6;
+  const vertsPerSide = (segU + 1) * (segV + 1);
+  const totalVerts = vertsPerSide * 2;
+  const pos = new Float32Array(totalVerts * 3);
+  const uvAttr = new Float32Array(totalVerts * 2);
+  const sideAttr = new Float32Array(totalVerts);
+  const indices = [];
 
-  // Base billboard quad (-0.5..0.5)
-  const baseQuad = new THREE.PlaneGeometry(1, 1, 1, 1);
-  const instGeo = new THREE.InstancedBufferGeometry();
-  instGeo.index = baseQuad.index;
-  instGeo.attributes.position = baseQuad.attributes.position;
-  instGeo.attributes.uv = baseQuad.attributes.uv;
-
-  // aSpray: x = phase [0..1], y = emitterKind (0=bowChineSheet, 1=sternWashMist), z = side (-1/+1), w = rand
-  const aSpray = new Float32Array(TOTAL * 4);
-  const r = rng(919);
-
-  for (let i = 0; i < TOTAL; i++) {
-    const k = i * 4;
-    aSpray[k] = (i / TOTAL + r() * 0.04) % 1.0;
-    aSpray[k + 1] = (i / TOTAL) < 0.72 ? 0.0 : 1.0;
-    aSpray[k + 2] = (i % 2 === 0) ? 1.0 : -1.0;
-    aSpray[k + 3] = r();
+  let vPtr = 0;
+  for (let sIdx = 0; sIdx < 2; sIdx++) {
+    const side = sIdx === 0 ? -1.0 : 1.0;
+    const baseV = vPtr;
+    for (let iu = 0; iu <= segU; iu++) {
+      const u = iu / segU; // 0 near bow stem .. 1 aft chine
+      for (let iv = 0; iv <= segV; iv++) {
+        const v = iv / segV; // 0 attached to chine .. 1 outer folding water edge
+        pos[vPtr * 3] = 106;
+        pos[vPtr * 3 + 1] = 0;
+        pos[vPtr * 3 + 2] = 5;
+        uvAttr[vPtr * 2] = u;
+        uvAttr[vPtr * 2 + 1] = v;
+        sideAttr[vPtr] = side;
+        vPtr++;
+      }
+    }
+    for (let iu = 0; iu < segU; iu++) {
+      for (let iv = 0; iv < segV; iv++) {
+        const a = baseV + iu * (segV + 1) + iv;
+        const b = a + 1;
+        const c = a + (segV + 1);
+        const d = c + 1;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
   }
 
-  instGeo.setAttribute('aSpray', new THREE.InstancedBufferAttribute(aSpray, 4));
-  instGeo.instanceCount = TOTAL;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvAttr, 2));
+  geo.setAttribute('aSide', new THREE.BufferAttribute(sideAttr, 1));
+  geo.setIndex(indices);
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -1163,82 +1184,40 @@ function buildBoatSpray(scene, coastT, fog) {
     },
     transparent: true,
     depthWrite: false,
+    side: THREE.DoubleSide,
     vertexShader: /* glsl */`
       ${COAST_GLSL}
-      attribute vec4 aSpray;
+      attribute float aSide;
       varying vec2 vUv;
-      varying float vAlpha;
       varying vec3 vWPos;
 
       void main() {
         vUv = uv;
-        float phase = aSpray.x;
-        float kind = aSpray.y;
-        float side = aSpray.z;
-        float rnd = aSpray.w;
+        float u = uv.x; // 0 forward bow stem .. 1 mid-hull chine
+        float v = uv.y; // 0 hull contact .. 1 outer water landing
+        float side = aSide;
 
-        float r1 = fract(rnd * 7.13);
-        float r2 = fract(rnd * 13.37);
-
-        // Short, tight lifecycle so sheets stay locked to the hull chines
-        float lifeSpan = mix(0.32, 0.48, r1);
-        float age = fract(uWTime / lifeSpan + phase);
-        float dt = age * lifeSpan;
-
-        float tauEmit = uBoatParams.z - dt * ${BOAT_TAU_RATE.toFixed(4)};
-        vec2 bPos = boatCenter(tauEmit);
-        vec2 bVel = boatVelocity(tauEmit);
+        float tauNow = uBoatParams.z;
+        vec2 bPos = boatCenter(tauNow);
+        vec2 bVel = boatVelocity(tauNow);
         vec2 bFwd = normalize(bVel);
         vec2 bRight = vec2(-bFwd.y, bFwd.x);
 
-        vec2 emitXZ;
-        vec3 vel0;
-        float baseSize;
+        // Follow the flared V-hull chine from bow stem (along = +2.3m) to midships (along = -1.2m)
+        float along = mix(2.25, -1.15, u);
+        float hullHalfW = mix(0.22, 1.02, smoothstep(0.0, 0.65, u));
+        // Sheet peels outward in a smooth parabolic arc and lands back on the water
+        float sheetWidth = (0.35 + 0.65 * sin(u * 3.14159)) * (0.42 + 0.18 * clamp(uBoatParams.w, 0.0, 1.4));
+        float outDist = hullHalfW + v * sheetWidth;
 
-        if (kind < 0.5) {
-          // Low, sleek bow chine water sheet skimming outward along the water surface
-          float along = mix(0.2, 2.35, r1);
-          float hullHalfW = mix(0.96, 0.24, clamp((along - 0.2) / 2.15, 0.0, 1.0));
-          emitXZ = bPos + bFwd * along + bRight * (side * hullHalfW);
-          float outSpd = 1.65 + r2 * 0.95;
-          float upSpd = 0.55 + r2 * 0.45;
-          vec2 vxz = bVel * 0.78 + bRight * (side * outSpd);
-          vel0 = vec3(vxz.x, upSpd, vxz.y);
-          baseSize = mix(0.28, 0.68, age);
-        } else {
-          // Low stern prop-wash mist hugging the wake trough
-          float along = -2.95 - r1 * 0.35;
-          float across = side * (0.12 + r2 * 0.20);
-          emitXZ = bPos + bFwd * along + bRight * across;
-          vec2 vxz = bVel * 0.42 - bFwd * (1.1 + r2 * 0.9) + bRight * (side * 0.35);
-          vel0 = vec3(vxz.x, 0.62 + r1 * 0.42, vxz.y);
-          baseSize = mix(0.32, 0.76, age);
-        }
-
-        float dragK = 2.6;
-        float dragDist = (1.0 - exp(-dt * dragK)) / dragK;
-        vec2 worldXZ = emitXZ + vel0.xz * dragDist;
+        vec2 worldXZ = bPos + bFwd * (along - v * 0.55) + bRight * (side * outDist);
         vec4 c = coastAt(worldXZ);
         float waterY = waterEta(worldXZ, uWTime, c) + boatWakeField(worldXZ, uWTime).x;
-        float worldY = max(waterY + 0.03, waterY + 0.04 + vel0.y * dt - 0.5 * 9.81 * dt * dt);
-        vec3 centerW = vec3(worldXZ.x, worldY, worldXZ.y);
 
-        vec3 velNow = vec3(vel0.xz * exp(-dt * dragK), vel0.y - 9.81 * dt);
-        vec3 camRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-        vec3 camUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-
-        vec2 screenVel = vec2(dot(velNow, camRight), dot(velNow, camUp));
-        float sLen = length(screenVel);
-        vec2 dir2D = sLen > 0.05 ? screenVel / sLen : vec2(0.0, 1.0);
-        vec2 perp2D = vec2(-dir2D.y, dir2D.x);
-
-        float stretch = mix(2.1, 1.35, age);
-        vec3 billOffset = (dir2D.x * camRight + dir2D.y * camUp) * (position.y * baseSize * stretch)
-                        + (perp2D.x * camRight + perp2D.y * camUp) * (position.x * baseSize * 0.55);
-
-        vWPos = centerW + billOffset;
-        float env = smoothstep(0.0, 0.18, age) * (1.0 - smoothstep(0.38, 1.0, age));
-        vAlpha = env * 0.28;
+        // Smooth parabolic sheet arch: rises slightly off the chine and curves back down to waterY
+        float arch = 4.0 * v * (1.0 - v) * sin(u * 3.14159) * 0.14;
+        float chineLift = (1.0 - v) * 0.05 * sin(u * 3.14159);
+        vWPos = vec3(worldXZ.x, waterY + 0.018 + arch + chineLift, worldXZ.y);
 
         gl_Position = projectionMatrix * viewMatrix * vec4(vWPos, 1.0);
       }
@@ -1249,38 +1228,39 @@ function buildBoatSpray(scene, coastT, fog) {
       uniform float uFogNear;
       uniform float uFogFar;
       varying vec2 vUv;
-      varying float vAlpha;
       varying vec3 vWPos;
 
       void main() {
-        vec2 p = vUv * 2.0 - 1.0;
-        float r2 = dot(p, p);
-        if (r2 > 1.0) discard;
+        float u = vUv.x;
+        float v = vUv.y;
+        // Smooth, translucent glassy water sheet tapering at fore/aft ends and outer lip
+        float envU = smoothstep(0.0, 0.18, u) * (1.0 - smoothstep(0.72, 1.0, u));
+        float envV = smoothstep(0.0, 0.15, v) * (1.0 - smoothstep(0.55, 1.0, v));
+        float lipHighlight = exp(-pow((v - 0.38) / 0.22, 2.0)) * envU;
 
-        // Smooth Gaussian water-mist veil (zero high-frequency noise speckles!)
-        float radial = exp(-r2 * 2.8) * (1.0 - r2);
-        float alpha = radial * vAlpha;
-        if (alpha < 0.006) discard;
+        float alpha = (envU * envV * 0.26 + lipHighlight * 0.16);
+        if (alpha < 0.005) discard;
 
         float sunElev = max(uSunDirW.y, 0.0);
-        vec3 col = mix(uInscatter, uFoamCol * (0.88 + 0.10 * sunElev), 0.78);
+        vec3 sheetAqua = mix(uInscatter, uFoamCol * (0.86 + 0.10 * sunElev), 0.58);
+        vec3 col = mix(sheetAqua, uFoamCol * 0.92, clamp(lipHighlight * 0.65, 0.0, 0.75));
 
         float camDist = length(cameraPosition - vWPos);
         float fogK = smoothstep(uFogNear, uFogFar, camDist);
         col = mix(col, uFogCol, fogK);
 
-        gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.32));
+        gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.36));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
     `,
   });
 
-  const mesh = new THREE.Mesh(instGeo, mat);
+  const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 3;
   scene.add(mesh);
-  return { mesh, instGeo, maxCount: TOTAL };
+  return { mesh };
 }
 
 // ---------------------------------------------------------------------------
@@ -1456,13 +1436,10 @@ function boats(ctx) {
       speed.rotateZ(speedState.pitch);
       speed.rotateX(speedState.roll);
 
-      // 3. Sync shared GPU boat uniforms for the ocean shader, curved 3D wake, and 3D spray
+      // 3. Sync shared GPU boat uniforms for the ocean shader, curved 3D wake, and 3D bow sheet
       coastUniforms.uBoatWake.value.set(x, z, fwdX, fwdZ);
       coastUniforms.uBoatParams.value.set(1.0, curvature, speedState.tau, speedState.sprayBurst);
-
-      // Adapt spray instance count smoothly to active quality tier
-      const qTier = coastUniforms.uQualityTier.value;
-      spray.instGeo.instanceCount = qTier < 0.5 ? 110 : (qTier < 1.5 ? 165 : spray.maxCount);
+      spray.mesh.visible = coastUniforms.uQualityTier.value >= 0.5;
     },
   };
 }

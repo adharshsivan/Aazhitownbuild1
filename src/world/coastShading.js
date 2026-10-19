@@ -517,14 +517,10 @@ export function makeCoastGroundMaterial(T) {
           vec4 f0 = texture2D(uBeachDetail, fuv);
           gCol *= mix(0.64, 1.0, f0.g);
         }
-        // ---- subtle fading swash bubble residue on freshly washed sand
-        vec2 swUv = gxz * 0.14 + vec2(0.0, uWTime * 0.008);
-        vec4 swN1 = texture2D(uNoiseTex, swUv);
-        vec4 swN2 = texture2D(uNoiseTex, rot2(gxz, 0.68) * 0.34 + swN1.rg * 0.25);
-        float lace = swN1.r * 0.45 + swN2.g * 0.55;
-        float gRes = gResidue * (1.0 - gSub) * gBeach;
-        float resF = smoothstep(0.58 - gRes * 0.22, 0.88 - gRes * 0.16, lace) * gRes;
-        gCol = mix(gCol, uFoamCol * 0.78, resF * 0.28);
+        // ---- subtle, smooth fading swash water sheen on freshly washed sand (zero furry noise patches)
+        float swMacro = texture2D(uNoiseTex, gxz * 0.045 + vec2(0.0, uWTime * 0.006)).r;
+        float gRes = gResidue * (1.0 - gSub) * gBeach * (0.75 + 0.25 * swMacro);
+        gCol = mix(gCol, uFoamCol * 0.76, gRes * 0.18);
         diffuseColor.rgb = gCol;
         // ---- gentle wind-swept sand undulation (smooth, zero gritty pits or corduroy stripes)
         float ripFade = 1.0 - smoothstep(28.0, 95.0, gCam);
